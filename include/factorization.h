@@ -44,7 +44,7 @@ private:
  * @param n number to provide decomposition for.
  */
 template<typename T, typename E> factorization<T,E>::factorization(T n) {
-    assert(n>=0 && n<std::numeric_limits<unsigned short>::max());
+    //assert(n>=0 && n<=std::numeric_limits<unsigned short>::max());
     if( n>1 ){
         // create the map of primes the decomposition is performed over
         utils::prime_factors<T,E>(n,this->factors);

@@ -164,7 +164,7 @@ thread_pool<T>::~thread_pool() {
  * @pool[in] pool Reference to the thread pool
  */
 template<typename T, typename Job> std::future<T> async(Job job, thread_pool<std::packaged_task<T()> >& pool) {
-    std::packaged_task<T()> task(job);
+    std::packaged_task<T()> task(std::move(job));
     auto f = task.get_future(); // get future to obtain result
     pool.submit(std::move(task));
     return f;

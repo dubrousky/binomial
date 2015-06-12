@@ -17,11 +17,11 @@ template<typename T> T binomial2(T n, T k);
 
 int main(int argc, char** argv) {
     auto start(std::chrono::system_clock::now());
-    std::string offset = "                              ";
+    std::string offset = std::string(200,' ');
     binomial<unsigned long long> b_ull;
     binomial1<unsigned long long> b1_ull;
     binomial_factorization<unsigned int> bf_ull;
-    for( auto i = 0; i < 30; ++i ) {
+    for( auto i = 0; i < 100; ++i ) {
         std::cout << offset;
         offset = offset.substr(1);
         for( auto j = 0; j <= i; ++j ) {
@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
         std::cout<<std::endl;
     }
     auto end(std::chrono::system_clock::now());
+    std::cout<<std::endl;
     std::cout<<"timing: "<<(end-start).count()<<std::endl;
 
     return 0;

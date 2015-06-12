@@ -55,9 +55,9 @@ namespace utils {
  */
     template<typename T, typename E>
     void prime_factors(T n, std::map<T, E> &factors) {
-        assert(n<std::numeric_limits<unsigned short>::max());
+        //assert(n<std::numeric_limits<unsigned short>::max());
         // std::cout<<"n ="<<n<<" limit= "<<std::numeric_limits<unsigned short>::max()<<std::endl;
-        const auto p = primes_int16;
+        const auto p = cached_primes_int16();
         // do a trial division and store the 'exponent'
         for (auto i = 0; i < (unsigned int)sqrt(n) + 1; ++i) {
             if (p[i] * p[i] > n) break;

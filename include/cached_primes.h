@@ -5,7 +5,6 @@
 #ifndef BINOMIAL_CACHED_PRIMES_H
 #define BINOMIAL_CACHED_PRIMES_H
 namespace utils {
-    extern const unsigned short primes_int16[];
     /// @brief function that returns primes packed in a vector
     const std::vector<unsigned short>& cached_primes_int16();
 }

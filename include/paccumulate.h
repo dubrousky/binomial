@@ -4,6 +4,7 @@
 
 #ifndef BINOMIAL_PACCUMULATE_H
 #define BINOMIAL_PACCUMULATE_H
+#include<thread_pool.h>
 
 // Mix in unity information to the binary operation that satisfies the fold-left criteria
 template<typename Operation>
