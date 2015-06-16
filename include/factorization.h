@@ -8,6 +8,7 @@
 
 #include <iosfwd>
 #include <sstream>
+#include <utils.h>
 
 /*
  * @class Factorization

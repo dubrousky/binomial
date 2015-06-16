@@ -5,7 +5,7 @@
 #ifndef BINOMIAL_UTILS_H
 #define BINOMIAL_UTILS_H
 #include <cached_primes.h>
-
+#include <math.h>
 namespace utils {
 /**
  * The function returns the vector of flags that is true for vector indices that are primes:
@@ -22,6 +22,9 @@ namespace utils {
  * Output: all i such that A[i] is true.
  * Optimization for calculating the primes can be done with precalculating the
  * table of primes to do a simple lookup instead of calculation;
+ *
+ * @param[in] n max number to search primes for
+ * @param[inout] res resulting vector of primes
  */
     template<typename T>
     void primes_less_or_equal(T n, std::vector<T> &res) {
@@ -48,10 +51,15 @@ namespace utils {
     }
 
 /**
+ * @brief function returns prime numbers [2..sqrt(n)]
+ *
  * The function produces prime factors for the submitted number by trial division.
  * The process includes finding all primes in the range of [2..sqrt(n)] and may be
  * very time consuming. For repeated calculation the optimization may be to memorize
  * the primes between the calls in some table.
+ *
+ * @param[in] n number that shall be factorized
+ * @param[inout] factors map to store factors found
  */
     template<typename T, typename E>
     void prime_factors(T n, std::map<T, E> &factors) {
@@ -69,5 +77,15 @@ namespace utils {
         if (n > 1)
             factors[n] += 1;
     }
+/**
+ * @brief function to do a benchmarking and print time used
+ */
+    template<typename F, typename... Args>
+    void timing(F f, Args&&... args ) {
+        auto start(std::chrono::system_clock::now());
+        f(args...);
+        auto end(std::chrono::system_clock::now());
+        std::cout<<"timing: "<<(end-start).count()<<std::endl;
+    };
 }
 #endif //BINOMIAL_UTILS_H

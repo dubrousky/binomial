@@ -15,6 +15,9 @@
  * This class defines the dumb and inefficient way of test calculation
  * of C(n,k) = n!/(k!*(n-k)!) = P(k+1,..,n)/P(1,..,n-k); P stands for product.
  *
+ * The binomial coefficients are calculated up to (unsigned int)n = 19; larger
+ * values must be calculated with factorization algorithm.
+ *
  */
 template <typename T> class binomial : public std::binary_function<T,T,T> {
 public:
@@ -32,7 +35,7 @@ public:
  */
 template<typename T> T binomial<T>::operator()(T n, T k) {
     assert(n >= k);
-    assert(n > 0);
+    assert(n >= 0);
     assert(k >= 0);
     k = std::max(n-k,k); // optimization to avoid long multiplications and overflow on division
     std::vector<T> numerator;

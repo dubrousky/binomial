@@ -10,9 +10,11 @@
 #include <vector>
 #include <future>
 #include <queue>
+#include <iostream>
+#include <numeric>
+#include <memory>
 
-template< class T > class thread_pool;
-
+class thread_pool;
 /**
  * @class worker
  * @brief class for picking the job from the thread pool task queue.
@@ -22,54 +24,17 @@ template< class T > class thread_pool;
  * it does not spawn the background thread - it uses the predefined
  * number of worker threads.
  */
-template<class T>
 class worker {
 public:
     /// @brief constructor
-    explicit worker(thread_pool<T>& s) : pool(s) { }
+    explicit worker(thread_pool& s) : pool(s) { }
     /// @brief operator for executing the event loop
     void operator()();
 private:
     /// @memo link to the thread pool to get the
-    thread_pool<T>& pool;
+    thread_pool& pool;
 };
 
-/**
- * @fn template<class T> void worker<T>::operator()()
- * @brief Runs the execution cycle in the thread.
- *
- * The thread executes the following cycle:
- * - waits for task to be available on the queue
- * - executes the task
- */
-template<class T> void worker<T>::operator()()
-{
-    T task;
-    while(true)
-    {
-        {   // acquire lock
-            std::unique_lock<std::mutex> lock(pool.queue_mutex);
-
-            // look for a work item
-            while(!pool.stopping && pool.tasks.empty())
-            { // if there are none wait for notification
-                pool.work_available.wait(lock);
-            }
-
-            if(pool.stopping) // exit if the pool is stopped
-                return;
-
-            // get the task from the queue
-            task = std::move(pool.tasks.front());
-
-            pool.tasks.pop();
-
-        }   // release lock
-
-        // execute the task to complete the associated future
-        task();
-    }
-}
 /**
  * @class thread_pool
  *
@@ -81,7 +46,7 @@ template<class T> void worker<T>::operator()()
  * std::packaged_task to submit into the thread pool and the
  * std::future linked to the packaged task
  */
-template<class T>
+
 class thread_pool {
 public:
     /// @brief Constructor
@@ -90,83 +55,169 @@ public:
     /// @info No copy or assignment
     thread_pool(const thread_pool&) = delete;
     thread_pool& operator=(const thread_pool&) = delete;
-    /// @brief Method to submit the work into the queue
-    void submit(T f);
+
     /// @brief Destructor
     ~thread_pool();
+    /// @brief Submits task of typr void->void to the thread pool for execution
+    template <template<typename> class Task>
+    std::future<void> async(Task<void()> f);
+    /// @brief Submits task of typr (args...)->void to the thread pool for execution
+    template<typename... Args, template<typename> class Task>
+    std::future<void> async(Task<void(Args...)> f, Args... args);
+
+    /// @brief Submits task of typr (void)->ret to the thread pool for execution
+    template<typename Ret, template<typename> class Task>
+    std::future<Ret> async(Task<Ret()> f);
+    /// @brief Submits task of typr (args...)->ret to the thread pool for execution
+    template<typename Ret, typename... Args, template<typename> class Task>
+    std::future<Ret> async(Task<Ret(Args...)> f, Args... args);
+
+    /// @brief Executes the parallel version of std::accumulate on the thread pool
+    template<typename R, typename Iterator, typename BinOp >
+    R paccumulate(Iterator first,
+                  Iterator last,
+                               R start,
+                               BinOp bop,
+                               int fork_threshold = std::thread::hardware_concurrency());
+
 private:
-    friend class worker<T>;
+    friend class worker;
 
     // Threads
     std::vector< std::thread > workers;
 
     // Task queue
-    std::queue<T> tasks;
+    std::queue<std::future<void> > tasks;
 
     mutable std::mutex queue_mutex;
     std::condition_variable work_available;
-    bool stopping;
+    std::atomic<bool> stopping;
 };
 
-/**
- * @fn template<class T> void thread_pool<T>::submit(T f)
- *
- * @brief adds new work item to the pool's queue to wait for execution
- *
- * @param[in] f delayed task (usually std::packaged_task)
- */
-template<class T> void thread_pool<T>::submit(T f) {
-    { // acquire lock
-        std::unique_lock<std::mutex> lock(queue_mutex);
 
-        // add the task to the queue
-        tasks.push(std::move(f));
-    } // release lock
 
-    // wake up one thread
+/// @brief
+template<typename Ret, typename... Args, template<typename> class Task>
+std::future<Ret> thread_pool::async(Task<Ret(Args...)> f, Args... args) {
+    typedef Task<Ret(Args...)> F;
+    auto p = std::make_shared<std::promise<Ret> >(); // promise to be completed
+    // packaged task to evaluate function and complete a promise
+    auto task_wrapper = [p](F&& t,Args&&... as) {
+        try {
+            auto tmp = t(as...);
+            p->set_value(std::move(tmp));
+        } catch (...) {
+            p->set_exception(std::current_exception());
+        }
+    };
+    auto task = std::async(std::launch::deferred,task_wrapper,f,args...);
+    {
+        std::lock_guard<std::mutex> guard(queue_mutex);
+        tasks.push(std::move(task));
+    }
     work_available.notify_one();
+    return p->get_future();
 }
+/// @brief unary function void -> Ret
+template<typename Ret, template<typename> class Task>
+std::future<Ret> thread_pool::async(Task<Ret()> f) {
+    typedef Task<Ret()> F;
+    auto p = std::make_shared<std::promise<Ret> >(); // promise to be completed
+    // packaged task to evaluate function and complete a promise
+    auto task_wrapper = [p](F&& t) {
+        try {
+            p->set_value(t());
+        } catch (...) {
+            p->set_exception(std::current_exception());
+        }
+    };
+
+    auto task = std::async(std::launch::deferred,task_wrapper,std::move(f));
+    {
+        std::lock_guard<std::mutex> guard(queue_mutex);
+        tasks.push(std::move(task));
+    }
+    work_available.notify_one();
+    return p->get_future();
+}
+/// @brief
+template<typename... Args,template<typename> class Task>
+std::future<void> thread_pool::async(Task<void(Args...)> f, Args... args) {
+    typedef Task<void(Args...)> F;
+    auto p = std::make_shared<std::promise<void> >(); // promise to be completed
+    // packaged task to evaluate function and complete a promise
+    auto task_wrapper = [p](F&& t,Args&&...as) {
+        try {
+            t(as...);
+            p->set_value();
+        } catch (...) {
+            p->set_exception(std::current_exception());
+        }
+    };
+
+    auto task = std::async(std::launch::deferred,task_wrapper,f,args...);
+    {
+        std::lock_guard<std::mutex> guard(queue_mutex);
+        tasks.push(std::move(task));
+    }
+    work_available.notify_one();
+    return p->get_future();
+}
+
+/// @brief void -> void
+template <template<typename> class Task>
+std::future<void> thread_pool::async(Task<void()> f) {
+    typedef Task<void()> F;
+    auto p = std::make_shared<std::promise<void> >(); // promise to be completed
+    // packaged task to evaluate function and complete a promise
+    auto task_wrapper = [p](F&& t) {
+        try {
+            t();
+            p->set_value();
+        } catch (...) {
+            p->set_exception(std::current_exception());
+        }
+    };
+
+    auto task = std::async(std::launch::deferred,task_wrapper,std::move(f));
+    {
+        std::lock_guard<std::mutex> guard(queue_mutex);
+        tasks.push(std::move(task));
+    }
+    work_available.notify_one();
+    return p->get_future();
+}
+
+/// @brief (coll,start,op)->decltype(start)
+template<typename R, typename Iterator, typename BinOp>
+R thread_pool::paccumulate(Iterator first,Iterator last, R start, BinOp bop, int fork_threshold) {
+    std::vector<std::future<R> > intermediates;
+    // fork if the task volume is large enough
+    while(std::distance(first,last) > fork_threshold) {
+        Iterator mid = first;
+        std::advance(mid,fork_threshold);
+        auto handle = this->async([first,mid,bop]() -> R { return std::accumulate(first,mid,bop.unity(),bop);});
+        intermediates.push_back(std::move(handle));
+        std::advance(first,fork_threshold);
+    }
+    // calculate the rest itself if any
+    R res = (first!=last) ? res = std::accumulate(first, last, start, bop) : start;
+    // join the results (the load may be uneven)
+    return std::accumulate(intermediates.begin(),
+                           intermediates.end(),
+                           res,[&bop](R e,std::future<R>& f) {
+                return bop(e,f.get());
+            });
+}
+
 
 /**
- * @fn template<class T> thread_pool<T>::thread_pool(size_t threads)
- * @brief The constructor launches the configured amount of workers
+ * @class thread_pool_of<N>
+ * @brief convenience wrapper for creation of threads with compile time deduced number of threads
  */
-template<class T>
-thread_pool<T>::thread_pool(size_t threads)
-        :   stopping(false) {
-    for(size_t i = 0;i<threads;++i)
-        workers.push_back(std::thread(worker<T>(*this)));
-}
-
-/**
- * @fn template<class T> thread_pool<T>::~thread_pool()
- * @brief cancels the ongoing work and joins all threads
- */
-template<class T>
-thread_pool<T>::~thread_pool() {
-    // stopping all threads
-    stopping = true;
-    work_available.notify_all();
-
-    // join
-    for(size_t i = 0;i<workers.size();++i)
-        workers[i].join();
-}
-
-/**
- * @fn template<typename T, typename Job> std::future<T> async(Job job, thread_pool<std::packaged_task<T()> >& pool)
- * @brief Function analogous to std::async
- *
- * This is global method to  perform a packaged task calculation in the
- * thread pool
- *
- * @param[in] job Task to be peformed
- * @pool[in] pool Reference to the thread pool
- */
-template<typename T, typename Job> std::future<T> async(Job job, thread_pool<std::packaged_task<T()> >& pool) {
-    std::packaged_task<T()> task(std::move(job));
-    auto f = task.get_future(); // get future to obtain result
-    pool.submit(std::move(task));
-    return f;
-}
+template<unsigned short N>
+class thread_pool_of : public thread_pool {
+public:
+    thread_pool_of() : thread_pool(N){ }
+};
 #endif //BINOMIAL_THREADPOOL_H

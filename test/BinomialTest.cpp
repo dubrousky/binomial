@@ -4,6 +4,7 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 #include <binomial.h>
+#include <binomials.h>
 
 /**
 * To test the protected and private functionality one may inherit
@@ -35,36 +36,46 @@ public:
     //C(n,0), C(n,1), C(n,n-1), C(n,n), C(n,k) = C(n-1,k-1) + C(n-1,k), C(n,k) == C(n,n-k)
 
     void testCn0() {
-        binomial<int> bb;
+        binomials<int,calculate::seq_multiply> bb0;
+        binomials<int,calculate::seq_factorize> bb1;
+        binomials<int,calculate::async_multiply> bb2;
+        binomials<int,calculate::async_factorize> bb3;
+
         for(int i=1; i<13; ++i ) {
-            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",1,bb(i,0));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",1,bb0(i,0));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",1,bb1(i,0));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",1,bb2(i,0));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",1,bb3(i,0));
         }
     }
 
     void testCn1() {
-        binomial<int> bb;
+        binomials<int,calculate::seq_multiply> bb0;
+        binomials<int,calculate::seq_factorize> bb1;
+        binomials<int,calculate::async_multiply> bb2;
+        binomials<int,calculate::async_factorize> bb3;
         for(int i=1; i<13; ++i ) {
-            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,1) must be n",i,bb(i,1));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",i,bb0(i,1));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",i,bb1(i,1));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",i,bb2(i,1));
+            CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,0) must be 1",i,bb3(i,1));
         }
     }
 
     void testCnkCnnk() {
-        binomial<int> bb;
+        binomials<int,calculate::seq_multiply> bb0;
+        binomials<int,calculate::seq_factorize> bb1;
+        binomials<int,calculate::async_multiply> bb2;
+        binomials<int,calculate::async_factorize> bb3;
         for(int i=1; i<13; ++i ) {
             for(int j=1; j<i; ++j) {
-                CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,k) must be equal to C(n,n-k)", bb(i,j), bb(i, i-j));
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,k) must be equal to C(n,n-k)", bb0(i,j), bb0(i, i-j));
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,k) must be equal to C(n,n-k)", bb1(i,j), bb1(i, i-j));
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,k) must be equal to C(n,n-k)", bb2(i,j), bb2(i, i-j));
+                CPPUNIT_ASSERT_EQUAL_MESSAGE("C(n,k) must be equal to C(n,n-k)", bb3(i,j), bb3(i, i-j));
             }
         }
     }
-
-    void testTest() {
-
-        CPPUNIT_ASSERT_MESSAGE("Module Id of current task should be unloaded",
-                               false );
-        CPPUNIT_FAIL("Failed loading test library");
-    }
-
-
 
     // Add test cases to the test suite
     CPPUNIT_TEST_SUITE(BinomialTest);

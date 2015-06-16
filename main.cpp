@@ -3,36 +3,72 @@
 #include <vector>
 #include <assert.h>
 #include <future>
-#include <math.h>
 #include <thread_pool.h>
 #include <map>
 #include <binomial1.h>
 #include <binomial.h>
-#include <utils.h>
 #include "factorization.h"
 #include <binomial_factorization.h>
+#include <binomial_factorization1.h>
+#include <utils.h>
+#include <binomials.h>
 
 
-template<typename T> T binomial2(T n, T k);
-
+/// @brief the function calculates the C(n,k) of Pascals triangle for illustration
 int main(int argc, char** argv) {
-    auto start(std::chrono::system_clock::now());
-    std::string offset = std::string(200,' ');
-    binomial<unsigned long long> b_ull;
-    binomial1<unsigned long long> b1_ull;
-    binomial_factorization<unsigned int> bf_ull;
-    for( auto i = 0; i < 100; ++i ) {
-        std::cout << offset;
-        offset = offset.substr(1);
-        for( auto j = 0; j <= i; ++j ) {
-            std::cout.width(2);
-            std::cout<< bf_ull(i,j)<<" ";
+    binomials<unsigned int,calculate::seq_multiply>    bs0;
+    binomials<unsigned int,calculate::async_multiply>  bs1;
+    binomials<unsigned int,calculate::seq_factorize>   bs2;
+    binomials<unsigned int,calculate::async_factorize> bs3;
+
+    // faster than non-concurrent version
+    // TODO: try to use thread pool instead of std::async
+    utils::timing([&](){
+        for( auto i = (unsigned int)0; i < 100; ++i ) {
+            for( auto j = (unsigned int)0; j <= i; ++j ) {
+                std::cout.width(2);
+                std::cout<< bs3(i,j)<<" ";
+            }
+            std::cout<<std::endl;
         }
-        std::cout<<std::endl;
-    }
-    auto end(std::chrono::system_clock::now());
+    });
+    // Slower than direct multiplication but covers entire range of unsigned short.
+    utils::timing([&](){
+        for( auto i = (unsigned int)0; i < 100; ++i ) {
+            for( auto j = (unsigned int)0; j <= i; ++j ) {
+                std::cout.width(2);
+                std::cout<< bs2(i,j)<<" ";
+            }
+            std::cout<<std::endl;
+        }
+    });
+    // Not so fast and limited to n=19 algorithm. Needs number of threads and fork threshold
+    // tuning.
+    // TODO: try to use thread pool instead of std::async
+    utils::timing([&](){
+        for( auto i = (unsigned int)0; i < 20; ++i ) {
+            for( auto j = (unsigned int)0; j <= i; ++j ) {
+                std::cout.width(2);
+                std::cout<< bs1(i,j)<<" ";
+            }
+            std::cout<<std::endl;
+        }
+    });
+    // The fastest but limited to n=19 algorithm
+    utils::timing([&](){
+        for( auto i = (unsigned int)0; i < 20; ++i ) {
+            for( auto j = (unsigned int)0; j <= i; ++j ) {
+                std::cout.width(2);
+                std::cout<< bs0(i,j)<<" ";
+            }
+            std::cout<<std::endl;
+        }
+    });
+
+
+
     std::cout<<std::endl;
-    std::cout<<"timing: "<<(end-start).count()<<std::endl;
+
 
     return 0;
 }
